@@ -383,7 +383,7 @@ async fn main() {
     let matches = Arc::new(Mutex::new(HashMap::new()));
     let available = Arc::new(Mutex::new([0,0,0,0]));
 
-    let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap(); // will be changed after deploying
+    let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
 
     while let Ok((stream, _)) = listener.accept().await {
         let matches = Arc::clone(&matches);

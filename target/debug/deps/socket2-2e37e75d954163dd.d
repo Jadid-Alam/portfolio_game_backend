@@ -1,0 +1,11 @@
+C:\Users\jadid\Desktop\Computing\PROJECTS\portfolio_game_backend\target\debug\deps\libsocket2-2e37e75d954163dd.rmeta: C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\lib.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockaddr.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\socket.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockref.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sys\windows.rs
+
+C:\Users\jadid\Desktop\Computing\PROJECTS\portfolio_game_backend\target\debug\deps\libsocket2-2e37e75d954163dd.rlib: C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\lib.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockaddr.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\socket.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockref.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sys\windows.rs
+
+C:\Users\jadid\Desktop\Computing\PROJECTS\portfolio_game_backend\target\debug\deps\socket2-2e37e75d954163dd.d: C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\lib.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockaddr.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\socket.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockref.rs C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sys\windows.rs
+
+C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\lib.rs:
+C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockaddr.rs:
+C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\socket.rs:
+C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sockref.rs:
+C:\Users\jadid\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\socket2-0.5.8\src\sys\windows.rs:

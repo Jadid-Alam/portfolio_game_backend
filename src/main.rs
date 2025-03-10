@@ -1,7 +1,7 @@
 /* ************************************************
 Author:                                 Jadid Alam
 Date:                                   09/03/2025
-Version:                                       1.0
+Version:                                       1.1
 
 Description: Rust-based multiplayer game server
 handling game logic for 1v1 Scramble, featured in
@@ -30,11 +30,12 @@ use tokio_tungstenite::tungstenite::Message;
 
 
 type MatchID = String;
+const CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 struct Match {
-    player1: Option<mpsc::UnboundedSender<String>>,
-    player2: Option<mpsc::UnboundedSender<String>>,
+    player1: Option<mpsc::Sender<String>>,
+    player2: Option<mpsc::Sender<String>>,
     player_pts_1: usize,
     player_pts_2: usize,
     anagram: String,
@@ -103,7 +104,8 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     let mut player_number = 0;
     let mut match_id = String::new();
 
-    // when client asks for it, send data of available rooms until the client picks a room
+    let mut max_count_disconnect = 0;
+    // when client asks for it, send data of available rooms until the client picks a room. Also disconnects client if they are connected for more than 60s without choosing a match
     loop {
         match_id = match read.next().await {
             Some(Ok(msg)) if msg.is_text() => {
@@ -127,6 +129,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                         player_number = locked_array[3];
                     },
                     "r" => {
+                        max_count_disconnect += 1; // each r message comes in every 5s so 6 = 30s
                         if write.send(format!("a:{}{}{}{}", locked_array[0],locked_array[1],locked_array[2],locked_array[3]).into()).await.is_err() {
                             eprintln!("Failed to send match request message.");
                             return;
@@ -134,8 +137,6 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                     },
                     _ => println!("Invalid input {}",msg),
                 }
-
-                let updated_string: String = locked_array.iter().map(|&num| num.to_string()).collect::<Vec<String>>().join("");
                 drop(locked_array);
                 id
             },
@@ -147,9 +148,15 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
         if match_id == "a" || match_id == "b" || match_id == "c" || match_id == "d"{
             break;
         }
+        if max_count_disconnect > 6 {
+            let m1 = Arc::clone(&matches);
+            let a1 = Arc::clone(&available);
+            disconnect_player(&match_id,m1,a1).await;
+            return;
+        }
     }
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, mut rx) = mpsc::channel::<String>(CHANNEL_SIZE);
 
     // Assigning players correctly. Becasue of how mutex behaves first clint who chose a room will always have player_no = 1
     {
@@ -191,7 +198,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     drop(matches_lock);
 
     // Seeing if both players have joined
-    let mut max_count_disconnect = 0;
+    max_count_disconnect = 0;
     loop {
         let mut matches_lock = matches.lock().await;
         if let Some(game_match) = matches_lock.get(&match_id) {
@@ -201,32 +208,11 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                 break; // Exit the loop once both players have joined
             }
         }
-        if max_count_disconnect > 240 { // 120s, 1 = 0.5s so we wait for 120s before kicking out the client to avoid zombie clients
-            if let Some(game_match) = matches_lock.get_mut(&match_id) {
-                let mut locked_array = available.lock().await;
-                match match_id.as_str() {
-                    "a" => if locked_array[0] > 0 {
-                        locked_array[0] = 0;
-                    },
-                    "b" => if locked_array[1] > 0 {
-                        locked_array[1] = 0;
-                    },
-                    "c" => if locked_array[2] > 0 {
-                        locked_array[2] = 0;
-                    },
-                    "d" => if locked_array[3] > 0 {
-                        locked_array[3] = 0;
-                    },
-                    _ => println!("Invalid input"),
-                }
-                drop(locked_array);
-                matches_lock.remove(&match_id);
-                drop(matches_lock);
-                return;
-            } else {
-                eprintln!("Failed find the match");
-            }
-
+        if max_count_disconnect > 140 { // 70s, 1 = 0.5s so we wait for 70s before kicking out the client to avoid zombie clients
+            let m1 = Arc::clone(&matches);
+            let a1 = Arc::clone(&available);
+            disconnect_player(&match_id,m1,a1).await;
+            return;
         }
         drop(matches_lock);
         max_count_disconnect += 1;
@@ -250,14 +236,14 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                             let mut matches_lock = matches.lock().await;
                             if let Some(game_match) = matches_lock.get_mut(&match_id) {
                                 // making sure the opponent knows that the client has disconnected
-                                let mut opponent;
+                                let opponent;
                                 if player_number == 1 {
                                     opponent = &game_match.player2;
                                 } else {
                                     opponent = &game_match.player1;
                                 }
                                 if let Some(opponent_tx) = opponent {
-                                    if opponent_tx.send("f:x".to_string()).is_err() {
+                                    if opponent_tx.send("f:x".to_string()).await.is_err() {
                                         break;
                                     }
                                 }
@@ -282,7 +268,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                     }
                                     let opponent = &game_match.player2;
                                     if let Some(opponent_tx) = opponent {
-                                        if opponent_tx.send(format!("o:{}", game_match.player_pts_1)).is_err() {
+                                        if opponent_tx.send(format!("o:{}", game_match.player_pts_1)).await.is_err() {
                                             if write.send("f:x".into()).await.is_err() {
                                                 println!("Failed to send disconnect message message.");
                                             }
@@ -297,7 +283,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                     }
                                     let opponent = &game_match.player1;
                                     if let Some(opponent_tx) = opponent {
-                                        if opponent_tx.send(format!("o:{}", game_match.player_pts_2)).is_err() {
+                                        if opponent_tx.send(format!("o:{}", game_match.player_pts_2)).await.is_err() {
                                             if write.send("f:x".into()).await.is_err() {
                                                 println!("Failed to send disconnect message message.");
                                             }
@@ -339,14 +325,14 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                 if is_alive.elapsed() > Duration::from_secs(20) {
                     let mut matches_lock = matches.lock().await;
                     if let Some(game_match) = matches_lock.get_mut(&match_id) {
-                        let mut opponent;
+                        let opponent;
                         if player_number == 1 {
                             opponent = &game_match.player2;
                         } else {
                             opponent = &game_match.player1;
                         }
                         if let Some(opponent_tx) = opponent {
-                            if opponent_tx.send(format!("f:x")).is_err() {
+                            if opponent_tx.send(format!("f:x")).await.is_err() {
                                 break;
                             }
                         }
@@ -363,31 +349,32 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     }
 
     // Disconnecting player after the match has finished
+    let m1 = Arc::clone(&matches);
+    let a1 = Arc::clone(&available);
+    disconnect_player(&match_id,m1,a1).await;
+    return;
+
+}
+
+async fn disconnect_player(match_id: &str, matches: Matches, available: Available) {
     let mut matches_lock = matches.lock().await;
-    if let Some(game_match) = matches_lock.get_mut(&match_id) {
+    if let Some(_game_match) = matches_lock.get_mut(match_id) {
         let mut locked_array = available.lock().await;
-        match match_id.as_str() {
-            "a" => if locked_array[0] > 0 {
-                locked_array[0] = 0;
-            },
-            "b" => if locked_array[1] > 0 {
-                locked_array[1] = 0;
-            },
-            "c" => if locked_array[2] > 0 {
-                locked_array[2] = 0;
-            },
-            "d" => if locked_array[3] > 0 {
-                locked_array[3] = 0;
-            },
+        match match_id {
+            "a" => if locked_array[0] > 0 { locked_array[0] = 0; },
+            "b" => if locked_array[1] > 0 { locked_array[1] = 0; },
+            "c" => if locked_array[2] > 0 { locked_array[2] = 0; },
+            "d" => if locked_array[3] > 0 { locked_array[3] = 0; },
             _ => println!("Invalid input"),
         }
         drop(locked_array);
-        matches_lock.remove(&match_id);
+        if match_id == "a" || match_id == "b" || match_id == "c" || match_id == "d" {
+            matches_lock.remove(match_id);
+        }
         drop(matches_lock);
     } else {
-        eprintln!("Failed find the match");
+        eprintln!("Failed to find the match");
     }
-
 }
 
 

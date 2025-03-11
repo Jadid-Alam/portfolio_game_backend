@@ -151,6 +151,8 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
         if max_count_disconnect > 6 {
             let m1 = Arc::clone(&matches);
             let a1 = Arc::clone(&available);
+            // disconnect client
+            let _ = write.close().await;
             disconnect_player(&match_id,m1,a1).await;
             return;
         }
@@ -211,6 +213,8 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
         if max_count_disconnect > 140 { // 70s, 1 = 0.5s so we wait for 70s before kicking out the client to avoid zombie clients
             let m1 = Arc::clone(&matches);
             let a1 = Arc::clone(&available);
+            // disconnect client
+            let _ = write.close().await;
             disconnect_player(&match_id,m1,a1).await;
             return;
         }
@@ -348,6 +352,9 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
         }
     }
 
+
+    // disconnect client
+    let _ = write.close().await;
     // Disconnecting player after the match has finished
     let m1 = Arc::clone(&matches);
     let a1 = Arc::clone(&available);
@@ -368,9 +375,7 @@ async fn disconnect_player(match_id: &str, matches: Matches, available: Availabl
             _ => println!("Invalid input"),
         }
         drop(locked_array);
-        if match_id == "a" || match_id == "b" || match_id == "c" || match_id == "d" {
-            matches_lock.remove(match_id);
-        }
+        matches_lock.remove(match_id);
         drop(matches_lock);
     } else {
         eprintln!("Failed to find the match");

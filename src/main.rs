@@ -132,6 +132,8 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                         max_count_disconnect += 1; // each r message comes in every 5s so 6 = 30s
                         if write.send(format!("a:{}{}{}{}", locked_array[0],locked_array[1],locked_array[2],locked_array[3]).into()).await.is_err() {
                             eprintln!("Failed to send match request message.");
+                            // disconnect client
+                            let _ = write.close().await;
                             return;
                         }
                     },
@@ -142,6 +144,8 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
             },
             _ => {
                 eprintln!("Failed to receive match ID.");
+                // disconnect client
+                let _ = write.close().await;
                 return;
             }
         };

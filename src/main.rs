@@ -27,6 +27,7 @@ use tokio::sync::Mutex;
 use tokio::time::{interval, Duration, Instant};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_util::sync::CancellationToken;
 
 
 type MatchID = String;
@@ -40,41 +41,53 @@ struct Match {
     player_pts_2: usize,
     anagram: String,
     anagram_id: usize,
+    timer: CancellationToken,
 }
 
 impl Match {
     fn start_timer(&self, match_id: String, matches: Matches) {
+        let token = self.timer.clone(); // Clone the cancellation token
+
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(66)).await; // Wait 60s (game time) + 6s (getting ready)
-            let matches_lock = matches.lock().await;
-            if let Some(game_match) = matches_lock.get(&match_id) {
-                let player_pts_1 = game_match.player_pts_1;
-                let player_pts_2 = game_match.player_pts_2;
-                let (msg_p1, msg_p2) = if player_pts_1 > player_pts_2 {
-                    ("f:u".to_string(), "f:o".to_string())
-                } else if player_pts_2 > player_pts_1 {
-                    ("f:o".to_string(), "f:u".to_string())
-                } else {
-                    ("f:d".to_string(), "f:d".to_string())
-                };
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(66)) => {
+                    let matches_lock = matches.lock().await;
+                    if let Some(game_match) = matches_lock.get(&match_id) {
+                        let player_pts_1 = game_match.player_pts_1;
+                        let player_pts_2 = game_match.player_pts_2;
+                        let (msg_p1, msg_p2) = if player_pts_1 > player_pts_2 {
+                            ("f:u".to_string(), "f:o".to_string())
+                        } else if player_pts_2 > player_pts_1 {
+                            ("f:o".to_string(), "f:u".to_string())
+                        } else {
+                            ("f:d".to_string(), "f:d".to_string())
+                        };
 
-                if let Some(tx) = &game_match.player1 {
-                    let _ = tx.send(msg_p1).await.is_err();
+                        if let Some(tx) = &game_match.player1 {
+                            let _ = tx.send(msg_p1).await.is_err();
+                        }
+
+                        if let Some(tx) = &game_match.player2 {
+                            let _ = tx.send(msg_p2).await.is_err();
+                        }
+                    }
                 }
-
-                if let Some(tx) = &game_match.player2 {
-                    let _ = tx.send(msg_p2).await.is_err();
+                _ = token.cancelled() => {
+                    //println!("Timer for match {} was cancelled.", match_id);
                 }
             }
-            drop(matches_lock);
         });
+    }
+
+    async fn stop_timer(&self) {
+        self.timer.cancel();
     }
     fn rng_word(&mut self) {
         if self.anagram_id == 0 {
             let mut rng = rand::thread_rng();
-            self.anagram_id = rng.gen_range(1..=49);
+            self.anagram_id = rng.gen_range(1..=50);
+            println!("id: {}", self.anagram_id);
         }
-
     }
 }
 
@@ -132,6 +145,10 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                         max_count_disconnect += 1; // each r message comes in every 5s so 6 = 30s
                         if write.send(format!("a:{}{}{}{}", locked_array[0],locked_array[1],locked_array[2],locked_array[3]).into()).await.is_err() {
                             eprintln!("Failed to send match request message.");
+                            // Disconnecting player after the match has finished
+                            let m1 = Arc::clone(&matches);
+                            let a1 = Arc::clone(&available);
+                            disconnect_player(&match_id,m1,a1).await;
                             // disconnect client
                             let _ = write.close().await;
                             return;
@@ -144,6 +161,10 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
             },
             _ => {
                 eprintln!("Failed to receive match ID.");
+                // Disconnecting player after the match has finished
+                let m1 = Arc::clone(&matches);
+                let a1 = Arc::clone(&available);
+                disconnect_player(&match_id,m1,a1).await;
                 // disconnect client
                 let _ = write.close().await;
                 return;
@@ -174,6 +195,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
             player_pts_2: 0,
             anagram: String::from(""),
             anagram_id: 0,
+            timer: CancellationToken::new(),
         });
 
         if game_match.player1.is_none() {
@@ -182,6 +204,12 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
             game_match.player2 = Some(tx.clone());
         } else {
             eprintln!("Match {} is already full!", match_id);
+            // Disconnecting player after the match has finished
+            let m1 = Arc::clone(&matches);
+            let a1 = Arc::clone(&available);
+            disconnect_player(&match_id,m1,a1).await;
+            // disconnect client
+            let _ = write.close().await;
             return;
         }
         drop(matches_lock);
@@ -378,6 +406,7 @@ async fn disconnect_player(match_id: &str, matches: Matches, available: Availabl
             _ => println!("Invalid input"),
         }
         drop(locked_array);
+        _game_match.stop_timer().await;
         if match_id == "a" || match_id == "b" || match_id == "c" || match_id == "d"{
             matches_lock.remove(match_id);
         }

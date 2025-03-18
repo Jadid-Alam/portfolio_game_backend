@@ -86,7 +86,7 @@ impl Match {
         if self.anagram_id == 0 {
             let mut rng = rand::thread_rng();
             self.anagram_id = rng.gen_range(1..=50);
-            println!("id: {}", self.anagram_id);
+            //println!("id: {}", self.anagram_id);
         }
     }
 }
@@ -99,7 +99,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     let ws_stream = match accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
-            eprintln!("WebSocket handshake failed: {}", e);
+            //eprintln!("WebSocket handshake failed: {}", e);
             return;
         }
     };
@@ -109,7 +109,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     // Sending available rooms.
     let available_lock = available.lock().await;
     if write.send(format!("a:{}{}{}{}", available_lock[0],available_lock[1],available_lock[2],available_lock[3]).into()).await.is_err() {
-        eprintln!("Failed to send match request message.");
+        //eprintln!("Failed to send match request message.");
         return;
     }
     drop(available_lock);
@@ -144,7 +144,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                     "r" => {
                         max_count_disconnect += 1; // each r message comes in every 5s so 6 = 30s
                         if write.send(format!("a:{}{}{}{}", locked_array[0],locked_array[1],locked_array[2],locked_array[3]).into()).await.is_err() {
-                            eprintln!("Failed to send match request message.");
+                            //eprintln!("Failed to send match request message.");
                             // Disconnecting player after the match has finished
                             let m1 = Arc::clone(&matches);
                             let a1 = Arc::clone(&available);
@@ -154,13 +154,13 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                             return;
                         }
                     },
-                    _ => println!("Invalid input {}",msg),
+                    _ => {}//println!("Invalid input {}",msg),
                 }
                 drop(locked_array);
                 id
             },
             _ => {
-                eprintln!("Failed to receive match ID.");
+                //eprintln!("Failed to receive match ID.");
                 // Disconnecting player after the match has finished
                 let m1 = Arc::clone(&matches);
                 let a1 = Arc::clone(&available);
@@ -203,7 +203,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
         } else if game_match.player2.is_none() {
             game_match.player2 = Some(tx.clone());
         } else {
-            eprintln!("Match {} is already full!", match_id);
+            //eprintln!("Match {} is already full!", match_id);
             // Disconnecting player after the match has finished
             let m1 = Arc::clone(&matches);
             let a1 = Arc::clone(&available);
@@ -300,13 +300,13 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                 if player_number == 1 {
                                     game_match.player_pts_1 += s.len();
                                     if write.send(format!("p:{}", game_match.player_pts_1).into()).await.is_err() {
-                                        eprintln!("Failed to send answer message.");
+                                        //eprintln!("Failed to send answer message.");
                                     }
                                     let opponent = &game_match.player2;
                                     if let Some(opponent_tx) = opponent {
                                         if opponent_tx.send(format!("o:{}", game_match.player_pts_1)).await.is_err() {
                                             if write.send("f:x".into()).await.is_err() {
-                                                println!("Failed to send disconnect message message.");
+                                                //println!("Failed to send disconnect message message.");
                                             }
                                             break;
                                         }
@@ -315,13 +315,13 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                 else {
                                     game_match.player_pts_2 += s.len();
                                     if write.send(format!("p:{}", game_match.player_pts_2).into()).await.is_err() {
-                                        eprintln!("Failed to send answer message.");
+                                        //eprintln!("Failed to send answer message.");
                                     }
                                     let opponent = &game_match.player1;
                                     if let Some(opponent_tx) = opponent {
                                         if opponent_tx.send(format!("o:{}", game_match.player_pts_2)).await.is_err() {
                                             if write.send("f:x".into()).await.is_err() {
-                                                println!("Failed to send disconnect message message.");
+                                                //println!("Failed to send disconnect message message.");
                                             }
                                             break;
                                         }
@@ -332,17 +332,17 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                 // if client gets the answer wrong, they get their un saved points. (tells client they didn't get it correct)
                                 if player_number == 1 {
                                     if write.send(format!("p:{}", game_match.player_pts_1).into()).await.is_err() {
-                                        eprintln!("Failed to send answer message.");
+                                        //eprintln!("Failed to send answer message.");
                                     }
                                 }
                                 else {
                                     if write.send(format!("p:{}", game_match.player_pts_2).into()).await.is_err() {
-                                        eprintln!("Failed to send answer message.");
+                                        //eprintln!("Failed to send answer message.");
                                     }
                                 }
                             }
 
-                        } else { println!("Failed to receive guess message."); }
+                        } else {} //println!("Failed to receive guess message.");
                     }
                     drop(matches_lock);
                 }
@@ -377,7 +377,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                     break;
                 }
                 if write.send(Message::Ping(vec![])).await.is_err() {
-                    println!("Failed to send ping. Closing connection.");
+                    //println!("Failed to send ping. Closing connection.");
                     break;
                 }
             },
@@ -403,7 +403,7 @@ async fn disconnect_player(match_id: &str, matches: Matches, available: Availabl
             "b" => if locked_array[1] > 0 { locked_array[1] = 0; },
             "c" => if locked_array[2] > 0 { locked_array[2] = 0; },
             "d" => if locked_array[3] > 0 { locked_array[3] = 0; },
-            _ => println!("Invalid input"),
+            _ => {} //println!("Invalid input"),
         }
         drop(locked_array);
         _game_match.stop_timer().await;
@@ -413,7 +413,7 @@ async fn disconnect_player(match_id: &str, matches: Matches, available: Availabl
 
         drop(matches_lock);
     } else {
-        eprintln!("Failed to find the match");
+        //eprintln!("Failed to find the match");
     }
 }
 

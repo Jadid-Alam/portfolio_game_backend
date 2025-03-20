@@ -110,6 +110,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
     let available_lock = available.lock().await;
     if write.send(format!("a:{}{}{}{}", available_lock[0],available_lock[1],available_lock[2],available_lock[3]).into()).await.is_err() {
         //eprintln!("Failed to send match request message.");
+        let _ = write.close().await;
         return;
     }
     drop(available_lock);

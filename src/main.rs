@@ -155,7 +155,9 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                             return;
                         }
                     },
-                    _ => {}//println!("Invalid input {}",msg),
+                    _ => {
+                        //println!("Invalid input {}",msg);
+                    }
                 }
                 drop(locked_array);
                 id
@@ -343,7 +345,9 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
                                 }
                             }
 
-                        } else {} //println!("Failed to receive guess message.");
+                        } else {
+                            //println!("Failed to receive guess message.");
+                        } 
                     }
                     drop(matches_lock);
                 }
@@ -397,16 +401,18 @@ async fn handle_connection(stream: tokio::net::TcpStream, matches: Matches, avai
 
 async fn disconnect_player(match_id: &str, matches: Matches, available: Available) {
     let mut matches_lock = matches.lock().await;
+    let mut locked_array = available.lock().await;
+    match match_id {
+        "a" => if locked_array[0] > 0 { locked_array[0] = 0; },
+        "b" => if locked_array[1] > 0 { locked_array[1] = 0; },
+        "c" => if locked_array[2] > 0 { locked_array[2] = 0; },
+        "d" => if locked_array[3] > 0 { locked_array[3] = 0; },
+        _ => {
+            //println!("Invalid input");
+        } 
+    }
+    drop(locked_array);
     if let Some(_game_match) = matches_lock.get_mut(match_id) {
-        let mut locked_array = available.lock().await;
-        match match_id {
-            "a" => if locked_array[0] > 0 { locked_array[0] = 0; },
-            "b" => if locked_array[1] > 0 { locked_array[1] = 0; },
-            "c" => if locked_array[2] > 0 { locked_array[2] = 0; },
-            "d" => if locked_array[3] > 0 { locked_array[3] = 0; },
-            _ => {} //println!("Invalid input"),
-        }
-        drop(locked_array);
         _game_match.stop_timer().await;
         if match_id == "a" || match_id == "b" || match_id == "c" || match_id == "d"{
             matches_lock.remove(match_id);

@@ -332,9 +332,7 @@ async fn handle_guess(
                 (m.player_pts_2, m.player1.clone())
             }
         } else {
-            // Invalid guess: echo current score as rejection.
-            let pts = if player_number == 1 { m.player_pts_1 } else { m.player_pts_2 };
-            return write.send(format!("p:{}", pts).into()).await.is_ok();
+            return write.send("w:".into()).await.is_ok();
         }
     }; // lock dropped before awaiting
 
